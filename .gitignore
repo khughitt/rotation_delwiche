@@ -1,0 +1,11 @@
+csv/*
+data/*
+doc/
+logs/*
+output/*
+data
+.project
+.pydevproject
+.settings
+*.pyc
+__pycache__
