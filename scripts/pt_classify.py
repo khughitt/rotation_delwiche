@@ -49,8 +49,7 @@ def init_classification_rules():
         ProteinFamily("bHLH", "TF", ["HLH"]),
         ProteinFamily("bHSH", "TF", ["TF_AP-2"]),
         ProteinFamily("BSD domain containing", "PT", ["BSD"]),
-        ProteinFamily("bZIP1", "TF", ["bZIP_1"], ["HLH", "Homeobox"]),
-        ProteinFamily("bZIP2", "TF", ["bZIP_2"], ["HLH", "Homeobox"]),
+        ProteinFamily("bZIP", "TF", [], ["HLH", "Homeobox"], alt_domains=["bZIP_1", "bZIP_2"]),
         ProteinFamily("C2C2_CO-like", "TF", ["CCT", "zf-B_box"], ["GATA", "tify", "PLATZ"]),
         ProteinFamily("C2C2_Dof", "TF", ["zf-Dof"], ["GATA"]),
         ProteinFamily("C2C2_GATA", "TF", ["GATA"], ["tify", "zf-Dof"]),
@@ -77,8 +76,7 @@ def init_classification_rules():
         ProteinFamily("E2F/DP", "TF", ["E2F_TDP"]),
         ProteinFamily("EIL", "TF", ["EIN3"]),
         ProteinFamily("FHA", "TF", ["FHA"]),
-        ProteinFamily("GARP_ARR-B_G2", "TF", ["G2-like_Domain", "Response_reg"], ["CCT"]),
-        ProteinFamily("GARP_ARR-B_Myb", "TF", ["Response_reg", "Myb_DNA-binding"], ["CCT"]),
+        ProteinFamily("GARP_ARR-B", "TF", ["Response_reg"], ["CCT"], alt_domains=["G2-like_Domain", "Myb_DNA-binding"]),
         ProteinFamily("GARP_G2-like", "TF", ["G2-like_Domain"], ["Response_reg", "Myb_DNA-binding"]),
         ProteinFamily("GeBP", "TF", ["DUF573"]),
         ProteinFamily("GIF", "TR", ["SSXT"]),
@@ -87,8 +85,7 @@ def init_classification_rules():
         ProteinFamily("GRF", "TF", ["QLQ", "WRC"], []),
         ProteinFamily("HB", "TF", ["Homeobox"], ["EIN3", "KNOX1", "KNOX2", "HALZ", "bZIP_1"]),
         ProteinFamily("HB_KNOX", "TF", ["KNOX1", "KNOX2"]),
-        ProteinFamily("HD-Zip_bZIP_1", "TF", ["bZIP_1", "Homeobox"]),
-        ProteinFamily("HD-Zip_Halz", "TF", ["HALZ", "Homeobox"]),
+        ProteinFamily("HD-Zip", "TF", ["Homeobox"], alt_domains=["HALZ", "bZIP_1"]),
         ProteinFamily("HMG", "TR", ["HMG_box"], ["ARID", "YABBY"]),
         ProteinFamily("HRT", "TF", ["HRT"]),
         ProteinFamily("HSF", "TF", ["HSF_DNA-bind"]),
@@ -154,16 +151,23 @@ def init_classification_rules():
 
 class ProteinFamily(object):
     """Class representing a Protein Family classfication rule"""
-    def __init__(self, name, type_, requires, forbids=None):
+    def __init__(self, name, type_, requires, forbids=None, alt_domains=None):
         """Creates a new ProteinFamily instance"""
         self.name = name
         self.type = type_
         self.requires = set(requires)
         
+        # Forbidden domains
         if forbids is not None:
             self.forbids = set(forbids)
         else:
             self.forbids = set()
+            
+        # Alternate domains (one of two must be present)
+        if alt_domains is not None:
+            self.alt_domains = set(alt_domains)
+        else:
+            self.alt_domains = set()
     
     def in_family(self, contig):
         """Checks to see whether a contig belongs to the protein family.
@@ -173,7 +177,9 @@ class ProteinFamily(object):
         contig : set
             Set of protein domains associated with the contig
         """
-        return (self.requires.issubset(contig) and self.forbids.isdisjoint(contig))
+        return (self.requires.issubset(contig) and 
+                self.forbids.isdisjoint(contig) and
+                len(self.alt_domains.intersection(contig)) > 0)
     
 if __name__ == '__main__':
     #sys.exit(main())
