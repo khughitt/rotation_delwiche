@@ -8,6 +8,16 @@ Keith Hughitt <khughitt@umd.edu>
 Classifies matched protein domains based on the rules described in 
 Lang et al. (2010; doi: 10.1093/gbe/evq032)
 
+@TODO 2012/09/20: deal with multiple classifications (prioritize TF 
+classification)
+
+
+@TODO: verify classification rules
+@TODO: make sure no contigs are classified more than once
+@TODO: very contigs that are ruled out
+
+=> use E-value scores from HMMsearch output?
+
 Usage:
 ------
 pt_classify.py hmmertbl.csv hmmertbl2.csv...
@@ -25,12 +35,28 @@ def main():
     protein_families = init_classification_rules()
     
     # read in hmmer tables
-    for species in [hmmer.parse_csv(x) for x in sys.argv[1:]]:
-        # create list of domains for each contig
-        pass
+    for recarray in [hmmer.parse_csv(x) for x in sys.argv[1:]]:
+        # list to store contigs in
+        contigs = []
         
-    # TEMP: Debugging
-    return protein_families
+        # sort domain matches by contig id
+        for contig_id in set(recarray['target_name']):
+            domains = []
+            
+            # add unique domains associated with the contig id
+            for row in recarray[recarray['target_name'] == contig_id]:
+                if row['query_name'] not in [d.name for d in domains]:
+                    domain = ProteinDomain(row['query_name'], row['Evalue'])
+                    domains.append(domain)
+            
+            # create contig and add to the list
+            contigs.append(Contig(contig_id, domains))
+
+    # classify contigs
+    for contig in contigs:
+        for protein_family in protein_families:
+            if protein_family.in_family(contig):
+                print("%s: %s" % (contig.name, protein_family.name))
     
 def init_classification_rules():
     "Initializes protein classification rules"""
@@ -148,6 +174,61 @@ def init_classification_rules():
         ProteinFamily("Zinc finger, ZPR1", "TR", ["zf-ZPR1"]),
         ProteinFamily("Zn_clus", "TF", ["Zn_clus"])
     ]
+    
+class Contig(object):
+    """Class representing a single Contig, including all of it's matched
+    domains.
+    
+    In cases where similar domains are encountered, the highest-scoring domain
+    is kept, per the TAP classification guidelines.
+    """
+    def __init__(self, name, domains):
+        self.name = name
+        self.domains = domains
+        
+        # similar domains
+        self.similar_domains = [
+            set(["NF-YB", "NF-Y3", "CCAAT-Dr1_Domain"]),
+            set(["PHD", "Alfin-like"]),
+            set(["G2-like_Domain", "Myb_DNA-binding"]),
+            set(["GATA", "zf-Dof"])
+        ]
+        
+        # filter out similar domains and create a set with just the domain
+        # names for comparison
+        self._filter_similar()         
+
+    def get_domain_names(self):
+        """Returns a list of the matching domain names to use during 
+        classification"""
+        return set([d.name for d in self.domains])
+    
+    def _filter_similar(self):
+        """Check for similar domain matches and keep only the closest hit"""
+        for similar in self.similar_domains:
+            domain_names = self.get_domain_names()
+            
+            intersection = domain_names.intersection(similar)
+            
+            # if more than one similar domain exists
+            if len(intersection) > 1:
+                # find top hit
+                top_hit = sorted(self.domains, 
+                                 key=lambda domain: domain.evalue,
+                                 reverse=True).pop()
+
+                # remove all other domains
+                lower_hits = intersection.difference([top_hit.name])
+                
+                self.domains = filter(lambda d: d.name not in lower_hits, 
+                                      self.domains)
+            
+class ProteinDomain(object):
+    """Class representing a single protein domain"""
+    def __init__(self, name, evalue):
+        """Creates a new ProteinDomain instance"""
+        self.name = name
+        self.evalue = evalue
 
 class ProteinFamily(object):
     """Class representing a Protein Family classfication rule"""
@@ -177,9 +258,12 @@ class ProteinFamily(object):
         contig : set
             Set of protein domains associated with the contig
         """
-        return (self.requires.issubset(contig) and 
-                self.forbids.isdisjoint(contig) and
-                len(self.alt_domains.intersection(contig)) > 0)
+        contig_domains = contig.get_domain_names()
+        
+        return (self.requires.issubset(contig_domains) and 
+                self.forbids.isdisjoint(contig_domains) and
+                (len(self.alt_domains) == 0 or 
+                 len(self.alt_domains.intersection(contig_domains)) > 0))
     
 if __name__ == '__main__':
     #sys.exit(main())
