@@ -27,6 +27,8 @@ References:
  http://www.ncbi.nlm.nih.gov/pmc/articles/PMC2997552/
 """
 import sys
+import csv
+import os
 import hmmer
 
 def main():
@@ -35,7 +37,9 @@ def main():
     protein_families = init_classification_rules()
     
     # read in hmmer tables
-    for recarray in [hmmer.parse_csv(x) for x in sys.argv[1:]]:
+    for filepath in sys.argv[1:]:
+        recarray = hmmer.parse_csv(filepath)
+        
         # list to store contigs in
         contigs = []
         
@@ -51,12 +55,20 @@ def main():
             
             # create contig and add to the list
             contigs.append(Contig(contig_id, domains))
-
-    # classify contigs
-    for contig in contigs:
-        for protein_family in protein_families:
-            if protein_family.in_family(contig):
-                print("%s: %s" % (contig.name, protein_family.name))
+    
+        # open csv file for output
+        base_filename = os.path.splitext(os.path.basename(filepath))[0]
+        filename =  base_filename + "_classification.csv"
+        writer = csv.writer(open(os.path.join("../csv", filename), 'wt'))
+        writer.writerow(['contig', 'family', 'type'])
+    
+        # classify contigs
+        for contig in contigs:
+            for protein_family in protein_families:
+                if protein_family.in_family(contig):
+                    # write classification to csv
+                    writer.writerow([contig.name, protein_family.name, 
+                                                  protein_family.type])
     
 def init_classification_rules():
     "Initializes protein classification rules"""
