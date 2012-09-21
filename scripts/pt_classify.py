@@ -3,20 +3,15 @@
 """
 Plant TAP domain classification
 Keith Hughitt <khughitt@umd.edu>
-2012/09/16
+2012/09/21
 
 Classifies matched protein domains based on the rules described in 
 Lang et al. (2010; doi: 10.1093/gbe/evq032)
 
 @TODO 2012/09/20: deal with multiple classifications (prioritize TF 
 classification)
-
-
 @TODO: verify classification rules
-@TODO: make sure no contigs are classified more than once
-@TODO: very contigs that are ruled out
-
-=> use E-value scores from HMMsearch output?
+@TODO: verify contigs that are ruled out
 
 Usage:
 ------
@@ -29,6 +24,8 @@ References:
 import sys
 import csv
 import os
+import datetime
+import numpy as np
 import hmmer
 
 def main():
@@ -61,14 +58,48 @@ def main():
         filename =  base_filename + "_classification.csv"
         writer = csv.writer(open(os.path.join("../csv", filename), 'wt'))
         writer.writerow(['contig', 'family', 'type'])
+        
+        # create a list to keep track of classifications
+        classifications = []
     
         # classify contigs
         for contig in contigs:
             for protein_family in protein_families:
-                if protein_family.in_family(contig):
-                    # write classification to csv
-                    writer.writerow([contig.name, protein_family.name, 
-                                                  protein_family.type])
+                if contig.in_family(protein_family):
+                    classification = (contig.name, protein_family.name, 
+                                      protein_family.type)
+                    # write classification to csv and add to list
+                    classifications.append(classification)
+                    writer.writerow(classification)
+                    
+        # summarize results
+        filepath = os.path.join('../output/', base_filename + '_summary.txt')
+        now = datetime.datetime.now().strftime('%Y/%m/%d %H:%M:%S')
+        fp = open(filepath, 'w')
+        
+        # print header
+        fp.write("#\n")
+        fp.write("# TAP Classification Summary: %s\n" % (base_filename))
+        fp.write("# " + now + "\n")
+        fp.write("#\n\n")
+        
+        # convert to numpy array and transpose to make it easier to work with
+        # columns
+        cls = np.array(classifications, dtype=[('contig', '|S24'), 
+                                               ('family', '|S64'), 
+                                               ('type', '|S2')])
+        # number of each type
+        fp.write("TOTALS:\n")
+        fp.write("  TF: %d\n" % list(cls['type']).count("TF"))
+        fp.write("  TR: %d\n" % list(cls['type']).count("TR"))
+        fp.write("  PT: %d\n" % list(cls['type']).count("PT"))
+        fp.write("\n\n")
+        
+        fp.write("  TF: %d\n" % len(set(cls[cls['type'] == "TF"]['family'])))
+        fp.write("  TR: %d\n" % len(set(cls[cls['type'] == "TR"]['family'])))
+        fp.write("  PT: %d\n" % len(set(cls[cls['type'] == "PT"]['family'])))
+        
+        
     
 def init_classification_rules():
     "Initializes protein classification rules"""
@@ -214,6 +245,21 @@ class Contig(object):
         """Returns a list of the matching domain names to use during 
         classification"""
         return set([d.name for d in self.domains])
+
+    def in_family(self, family):
+        """Checks to see whether the contig belongs to a protein family.
+        
+        Parameters:
+        -----------
+        family : ProteinFamily
+            Protein family classification rules
+        """
+        contig_domains = self.get_domain_names()
+        
+        return (family.requires.issubset(contig_domains) and 
+                family.forbids.isdisjoint(contig_domains) and
+                (len(family.alt_domains) == 0 or 
+                 len(family.alt_domains.intersection(contig_domains)) > 0))
     
     def _filter_similar(self):
         """Check for similar domain matches and keep only the closest hit"""
@@ -261,21 +307,6 @@ class ProteinFamily(object):
             self.alt_domains = set(alt_domains)
         else:
             self.alt_domains = set()
-    
-    def in_family(self, contig):
-        """Checks to see whether a contig belongs to the protein family.
-        
-        Parameters:
-        -----------
-        contig : set
-            Set of protein domains associated with the contig
-        """
-        contig_domains = contig.get_domain_names()
-        
-        return (self.requires.issubset(contig_domains) and 
-                self.forbids.isdisjoint(contig_domains) and
-                (len(self.alt_domains) == 0 or 
-                 len(self.alt_domains.intersection(contig_domains)) > 0))
     
 if __name__ == '__main__':
     #sys.exit(main())
