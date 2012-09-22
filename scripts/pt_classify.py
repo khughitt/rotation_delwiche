@@ -24,7 +24,6 @@ References:
 import sys
 import csv
 import os
-import datetime
 import numpy as np
 import hmmer
 
@@ -32,6 +31,9 @@ def main():
     """Main application body""" 
     # initialize ProteinFamily instances for each set of classification rules
     protein_families = init_classification_rules()
+    
+    # create a master dictionary to keep track of results
+    results = {}
     
     # read in hmmer tables
     for filepath in sys.argv[1:]:
@@ -56,7 +58,8 @@ def main():
         # open csv file for output
         base_filename = os.path.splitext(os.path.basename(filepath))[0]
         filename =  base_filename + "_classification.csv"
-        writer = csv.writer(open(os.path.join("../csv", filename), 'wt'))
+        writer = csv.writer(open(os.path.join("../csv/classification", 
+                                              filename), 'wt'))
         writer.writerow(['contig', 'family', 'type'])
         
         # create a list to keep track of classifications
@@ -72,34 +75,34 @@ def main():
                     classifications.append(classification)
                     writer.writerow(classification)
                     
-        # summarize results
-        filepath = os.path.join('../output/', base_filename + '_summary.txt')
-        now = datetime.datetime.now().strftime('%Y/%m/%d %H:%M:%S')
-        fp = open(filepath, 'w')
+        # add to master dict
+        results[base_filename] = classifications
+                    
+    # write summary csv
+    write_summary_csv(results)
         
-        # print header
-        fp.write("#\n")
-        fp.write("# TAP Classification Summary: %s\n" % (base_filename))
-        fp.write("# " + now + "\n")
-        fp.write("#\n\n")
-        
-        # convert to numpy array and transpose to make it easier to work with
-        # columns
+def write_summary_csv(results):
+    """Write a summary csv report"""
+    filepath = '../csv/classification/classification_summary.csv'
+    writer = csv.writer(open(filepath, 'wt'))
+    writer.writerow(['species', 'TF (total)', 'TR (total)', 'PT (total)',
+                     'TF (unique)', 'TR (unique)', 'PT (unique)'])
+    
+    # convert to numpy array and transpose to make it easier to work with
+    # columns
+    for name, classifications in results.items():
         cls = np.array(classifications, dtype=[('contig', '|S24'), 
                                                ('family', '|S64'), 
                                                ('type', '|S2')])
         # number of each type
-        fp.write("TOTALS:\n")
-        fp.write("  TF: %d\n" % list(cls['type']).count("TF"))
-        fp.write("  TR: %d\n" % list(cls['type']).count("TR"))
-        fp.write("  PT: %d\n" % list(cls['type']).count("PT"))
-        fp.write("\n\n")
-        
-        fp.write("  TF: %d\n" % len(set(cls[cls['type'] == "TF"]['family'])))
-        fp.write("  TR: %d\n" % len(set(cls[cls['type'] == "TR"]['family'])))
-        fp.write("  PT: %d\n" % len(set(cls[cls['type'] == "PT"]['family'])))
-        
-        
+        writer.writerow((name,
+                         list(cls['type']).count("TF"), 
+                         list(cls['type']).count("TR"),
+                         list(cls['type']).count("PT"),
+                         len(set(cls[cls['type'] == "TF"]['family'])),
+                         len(set(cls[cls['type'] == "TR"]['family'])),
+                         len(set(cls[cls['type'] == "PT"]['family']))
+                        ))
     
 def init_classification_rules():
     "Initializes protein classification rules"""
