@@ -93,7 +93,7 @@ def main():
             
             # as long as there are no conflicts, add to new set
             if len(matches) == 1:
-                row = [new_name] + classification[1:]
+                row = tuple([new_name] + classification[1:])
                 collapsed.append(row)
                 writer.writerow(row)
             else:

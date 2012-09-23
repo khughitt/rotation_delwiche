@@ -4,6 +4,7 @@ Methods for working with HMMER3 CSV output
 Keith Hughitt <khughitt@umd.edu>
 2012/09/15
 """
+import re
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -20,21 +21,13 @@ def parse_csv(filepath):
     col_names = []
     width = 0
 
-    for col in dividers.split(" "):
-        col_size = len(col) + 1
-        
-        # skip leading #
-        if col == "#":
-            continue
+    # get a list of the dividers underneath the column names --
+    # we will use these to determine the width of each column
+    divider_parts = filter(None, re.split("(#?\s*-+\s+)", dividers))
 
-        # for first actual column, add a few chars to make up for leading #
-        #if len(col_names) == 0:
-        #    col_size += 1
-        
-        # some columns are separated by multiple spaces
-        if len(col) is 0:
-            width += col_size
-            continue
+    for col in divider_parts:
+        # get column width
+        col_size = len(col)
 
         # add column name and width
         col_names.append(nameline[width: width + col_size].lstrip("#").strip())
