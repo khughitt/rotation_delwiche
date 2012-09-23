@@ -69,14 +69,39 @@ def main():
         for contig in contigs:
             for protein_family in protein_families:
                 if contig.in_family(protein_family):
-                    classification = (contig.name, protein_family.name, 
-                                      protein_family.type)
-                    # write classification to csv and add to list
+                    classification = [contig.name, protein_family.name, 
+                                      protein_family.type]
+                    # add classification decision to list
                     classifications.append(classification)
-                    writer.writerow(classification)
                     
+                    
+        # collapse related contigs and write classification to csv
+        collapsed = []
+        
+        for classification in classifications:
+            # split contig name
+            parts = classification[0].split("_")
+            general_name = parts[0]
+            new_name = parts[0] + parts[-1]
+            
+            # find all similar contigs
+            similar = filter(lambda x: x[0].startswith(general_name), 
+                             classifications)
+            
+            # collapse list of domains for all matches
+            matches = set([x[1] for x in similar])
+            
+            # as long as there are no conflicts, add to new set
+            if len(matches) == 1:
+                row = [new_name] + classification[1:]
+                collapsed.append(row)
+                writer.writerow(row)
+            else:
+                print("(%s) multiple classifications for %s: %s" % 
+                      (base_filename, general_name, ", ".join(matches))) 
+
         # add to master dict
-        results[base_filename] = classifications
+        results[base_filename] = collapsed
                     
     # write summary csv
     write_summary_csv(results)
@@ -91,7 +116,7 @@ def write_summary_csv(results):
     # convert to numpy array and transpose to make it easier to work with
     # columns
     for name, classifications in results.items():
-        cls = np.array(classifications, dtype=[('contig', '|S24'), 
+        cls = np.array(classifications, dtype=[('contig', '|S32'), 
                                                ('family', '|S64'), 
                                                ('type', '|S2')])
         # number of each type

@@ -23,6 +23,14 @@ def parse_csv(filepath):
     for col in dividers.split(" "):
         col_size = len(col) + 1
         
+        # skip leading #
+        if col == "#":
+            continue
+
+        # for first actual column, add a few chars to make up for leading #
+        #if len(col_names) == 0:
+        #    col_size += 1
+        
         # some columns are separated by multiple spaces
         if len(col) is 0:
             width += col_size
