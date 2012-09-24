@@ -13,6 +13,9 @@ classification)
 @TODO: verify classification rules
 @TODO: verify contigs that are ruled out
 
+@TODO 2012/09/23 - verify redundant classification removal step; sort 
+classifications by family
+
 Usage:
 ------
 pt_classify.py hmmertbl.csv hmmertbl2.csv...
@@ -79,26 +82,37 @@ def main():
         collapsed = []
         
         for classification in classifications:
-            # split contig name
+            # before
+            # contig_<Number>_cN_seqN_<translation frame>
             parts = classification[0].split("_")
             general_name = parts[0]
-            new_name = parts[0] + parts[-1]
+            
+            family = classification[1]
+            
+            # after
+            # contig_<Number>_<translation frame>
+            new_name = parts[0] + "_" + parts[-1]
             
             # find all similar contigs
             similar = filter(lambda x: x[0].startswith(general_name), 
-                             classifications)
+                             collapsed)
             
             # collapse list of domains for all matches
             matches = set([x[1] for x in similar])
             
             # as long as there are no conflicts, add to new set
-            if len(matches) == 1:
+            if len(matches) == 0:
                 row = tuple([new_name] + classification[1:])
                 collapsed.append(row)
                 writer.writerow(row)
+            elif family in matches:
+                # if the same classification already exists, simply ignore for
+                # now
+                pass
             else:
                 print("(%s) multiple classifications for %s: %s" % 
-                      (base_filename, general_name, ", ".join(matches))) 
+                      (base_filename, 
+                       general_name, ", ".join(matches.union([family])))) 
 
         # add to master dict
         results[base_filename] = collapsed
