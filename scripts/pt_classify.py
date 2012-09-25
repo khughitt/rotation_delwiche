@@ -8,13 +8,12 @@ Keith Hughitt <khughitt@umd.edu>
 Classifies matched protein domains based on the rules described in 
 Lang et al. (2010; doi: 10.1093/gbe/evq032)
 
-@TODO 2012/09/20: deal with multiple classifications (prioritize TF 
-classification)
 @TODO: verify classification rules
-@TODO: verify contigs that are ruled out
-
-@TODO 2012/09/23 - verify redundant classification removal step; sort 
+@TODO 2012/09/23: verify redundant classification removal step; sort 
 classifications by family
+@TODO 2012/09/24: generate summary statistics for domain matches
+@TODO 2012/09/24: summarize overlap in families between species (pairwise 
+similarity?)
 
 Usage:
 ------
@@ -114,34 +113,85 @@ def main():
                       (base_filename, 
                        general_name, ", ".join(matches.union([family])))) 
 
-        # add to master dict
-        results[base_filename] = collapsed
-                    
+        # convert to recarray and add to master dict
+        datatypes = [('contig', '|S32'), ('family', '|S64'), ('type', '|S2')]
+        results[base_filename] = np.array(collapsed, dtype=datatypes)
+        
     # write summary csv
     write_summary_csv(results)
+    
+    return results
         
 def write_summary_csv(results):
-    """Write a summary csv report"""
+    """Write a summary csv reports"""
     filepath = '../csv/classification/classification_summary.csv'
     writer = csv.writer(open(filepath, 'wt'))
-    writer.writerow(['species', 'TF (total)', 'TR (total)', 'PT (total)',
-                     'TF (unique)', 'TR (unique)', 'PT (unique)'])
+    writer.writerow(['species', 'TR (total)', 'TF (total)', 'PT (total)',
+                     'TR (unique)', 'TF (unique)', 'PT (unique)'])
     
-    # convert to numpy array and transpose to make it easier to work with
-    # columns
-    for name, classifications in results.items():
-        cls = np.array(classifications, dtype=[('contig', '|S32'), 
-                                               ('family', '|S64'), 
-                                               ('type', '|S2')])
-        # number of each type
+    # create a dict to keep track unique matches:
+    #
+    # {
+    #    species1: {TR: {...}, TF:{...}, PT: {...}},
+    #    species2:...
+    #    etc,..
+    # }
+    #
+    tap_diversity = {}
+    
+    # write summary file with unique and total classification numbers
+    for name, cls in results.items():
+        # keep track of unique TAP familes
+        tap_diversity[name] = {
+            "TR": set(cls[cls['type'] == "TR"]['family']),
+            "TF": set(cls[cls['type'] == "TF"]['family']),
+            "PT": set(cls[cls['type'] == "PT"]['family'])
+        }
+        
+        # add row to summary csv
         writer.writerow((name,
-                         list(cls['type']).count("TF"), 
-                         list(cls['type']).count("TR"),
-                         list(cls['type']).count("PT"),
-                         len(set(cls[cls['type'] == "TF"]['family'])),
-                         len(set(cls[cls['type'] == "TR"]['family'])),
-                         len(set(cls[cls['type'] == "PT"]['family']))
-                        ))
+             list(cls['type']).count("TR"), 
+             list(cls['type']).count("TF"),
+             list(cls['type']).count("PT"),
+             len(tap_diversity[name]["TR"]),
+             len(tap_diversity[name]["TF"]),
+             len(tap_diversity[name]["PT"])
+        ))
+        
+    # write additional csv files with pair-wise correlations
+    species = tap_diversity.keys()
+    
+    for type_ in ["TR", "TF", "PT", "TOTAL"]:
+        filepath = '../csv/classification/correlations_%s.csv' % type_
+        writer = csv.writer(open(filepath, 'wt'))
+        writer.writerow([None] + species)     
+        
+        for i, species1 in enumerate(species):
+            if type_ == "TOTAL":
+                set1 = set(results[species1]['family'])
+            else:
+                set1 = tap_diversity[species1][type_]
+            
+            row = [species1]
+            
+            # find correlation for TAP complements for each species pair
+            for j, species2 in enumerate(species):
+                # only include one side of diagonal
+                if j > i:
+                    row.append(None)
+                    continue
+
+                if type_ == "TOTAL":
+                    set2 = set(results[species2]['family'])
+                else:
+                    set2 = tap_diversity[species2][type_]
+                    
+                # correlation = INTERSECTION(TAPs) / UNION(TAPs)
+                correlation = (len(set1.intersection(set2)) / 
+                               float(len(set1.union(set2))))
+                row.append(correlation)
+
+            writer.writerow(row)
     
 def init_classification_rules():
     "Initializes protein classification rules"""
@@ -352,6 +402,6 @@ class ProteinFamily(object):
     
 if __name__ == '__main__':
     #sys.exit(main())
-    rules = main() # TEMP: Debugging
+    results = main()
 
 
