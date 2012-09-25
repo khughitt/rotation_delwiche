@@ -39,104 +39,222 @@ def main():
     domains = {}
     
     # create necessary directories if they do not already exist
-    for d in ["classification", "domains", "taps"]:
-        dir = os.path.join("../csv/", d)
-        if not os.path.isdir(dir):
-            os.makedirs(dir)
+    create_output_dirs()
     
     # read in hmmer tables
     for filepath in sys.argv[1:]:
-        recarray = hmmer.parse_csv(filepath)
+        classify_species(filepath, results, domains, protein_families)
         
-        # output base filename
-        base_filename = os.path.splitext(os.path.basename(filepath))[0]
+    # generate a dictionary representing the diversity (unique) tap complements
+    # for each target species
+    tap_diversity = get_tap_diversity(results)
         
-        # list to store contigs in
-        contigs = []
-        
-        # keep a record of all the protein domains for each species
-        domains[base_filename] = []
-        
-        # sort domain matches by contig id
-        for contig_id in set(recarray['target_name']):
-            contig_domains = []
-            
-            # add unique domains associated with the contig id
-            for row in recarray[recarray['target_name'] == contig_id]:
-                if row['query_name'] not in [d.name for d in contig_domains]:
-                    domain = ProteinDomain(row['query_name'], row['Evalue'])
-                    contig_domains.append(domain)
-                    domains[base_filename].append(row['query_name'])
-            
-            # create contig and add to the list
-            contigs.append(Contig(contig_id, contig_domains))
-    
-        # open csv file for output
-        filename =  "classification_%s.csv" % base_filename 
-        writer = csv.writer(open(os.path.join("../csv/classifications", 
-                                              filename), 'wt'))
-        writer.writerow(['contig', 'family', 'type'])
-        
-        # create a list to keep track of classifications
-        classifications = []
-    
-        # classify contigs
-        for contig in contigs:
-            for protein_family in protein_families:
-                if contig.in_family(protein_family):
-                    classification = [contig.name, protein_family.name, 
-                                      protein_family.type]
-                    # add classification decision to list
-                    classifications.append(classification)
-                    
-                    
-        # collapse related contigs and write classification to csv
-        collapsed = []
-        
-        for classification in classifications:
-            # before
-            # contig_<Number>_cN_seqN_<translation frame>
-            parts = classification[0].split("_")
-            general_name = parts[0]
-            
-            family = classification[1]
-            
-            # after
-            # contig_<Number>_<translation frame>
-            new_name = parts[0] + "_" + parts[-1]
-            
-            # find all similar contigs
-            similar = filter(lambda x: x[0].startswith(general_name), 
-                             collapsed)
-            
-            # collapse list of domains for all matches
-            matches = set([x[1] for x in similar])
-            
-            # as long as there are no conflicts, add to new set
-            if len(matches) == 0:
-                row = tuple([new_name] + classification[1:])
-                collapsed.append(row)
-                writer.writerow(row)
-            elif family in matches:
-                # if the same classification already exists, simply ignore for
-                # now
-                pass
-            else:
-                print("(%s) multiple classifications for %s: %s" % 
-                      (base_filename, 
-                       general_name, ", ".join(matches.union([family])))) 
-
-        # convert to recarray and add to master dict
-        datatypes = [('contig', '|S32'), ('family', '|S64'), ('type', '|S2')]
-        results[base_filename] = np.array(collapsed, dtype=datatypes)
-        
-    # write summary csv
-    write_summary_csv(results)
-    
-    # write domain summary
+    # output summary files
+    write_classification_summary(results, tap_diversity)
     write_domain_summary_csv(domains)
-    
+    write_tap_correlation_csv(tap_diversity)
+
     return results
+
+def classify_species(filepath, results, domains, protein_families):
+    """Classifies a species using the results from hmmsearch"""
+    recarray = hmmer.parse_csv(filepath)
+    
+    # output base filename
+    target = os.path.splitext(os.path.basename(filepath))[0]
+           
+    # Load contigs with matching domains
+    contigs = load_contigs(target, recarray, domains)
+
+    # open csv file for output
+    filename =  "classification_%s.csv" % target
+    fp = open(os.path.join("../csv/classifications", filename), 'wt')
+    csv_writer = csv.writer(fp)
+    csv_writer.writerow(['contig', 'family', 'type'])
+
+    # classify contigs
+    classifications = classify_contigs(contigs, protein_families)
+
+    # collapse related contigs and write classification to csv
+    collapsed = collapse_contig_classifications(target, classifications, 
+                                                csv_writer)
+
+    # convert to recarray and add to master dict
+    datatypes = [('contig', '|S32'), ('family', '|S64'), ('type', '|S2')]
+    results[target] = np.array(collapsed, dtype=datatypes)
+
+def classify_contigs(contigs, protein_families):
+    """Classify contigs based on their domains"""
+    # create a list to keep track of classifications
+    classifications = []
+    
+    # classify contigs
+    for contig in contigs:
+        for protein_family in protein_families:
+            if contig.in_family(protein_family):
+                classification = [contig.name, protein_family.name, 
+                                  protein_family.type]
+                # add classification decision to list
+                classifications.append(classification)
+                
+    return classifications
+
+def load_contigs(target, recarray, domains):
+    """Loads matching contigs"""
+    contigs = []
+    
+    # keep a record of all the protein domains for each species
+    domains[target] = []
+    
+    for contig_id in set(recarray['target_name']):
+        contig_domains = []
+        
+        # add unique domains associated with the contig id
+        for row in recarray[recarray['target_name'] == contig_id]:
+            if row['query_name'] not in [d.name for d in contig_domains]:
+                domain = ProteinDomain(row['query_name'], row['Evalue'])
+                contig_domains.append(domain)
+                domains[target].append(row['query_name'])
+        
+        # create contig and add to the list
+        contigs.append(Contig(contig_id, contig_domains))
+        
+    return contigs
+
+def create_output_dirs():
+    """Creates output directories if they don't already exist"""
+    for d in ["classifications", "domains", "taps"]:
+        dir = os.path.join("../csv/", d)
+        if not os.path.isdir(dir):
+            os.makedirs(dir)
+
+def collapse_contig_classifications(target_name, classifications, csv_writer):
+    """Collapses _cN_seqN Trinitiy contig classifications"""
+    
+    collapsed = []
+    
+    for classification in classifications:
+        # before
+        # contig_<Number>_cN_seqN_<translation frame>
+        parts = classification[0].split("_")
+        general_name = parts[0]
+        
+        family = classification[1]
+        
+        # after
+        # contig_<Number>_<translation frame>
+        new_name = parts[0] + "_" + parts[-1]
+        
+        # find all similar contigs
+        similar = filter(lambda x: x[0].startswith(general_name), 
+                         collapsed)
+        
+        # collapse list of domains for all matches
+        matches = set([x[1] for x in similar])
+        
+        # as long as there are no conflicts, add to new set
+        if len(matches) == 0:
+            row = tuple([new_name] + classification[1:])
+            collapsed.append(row)
+            csv_writer.writerow(row)
+        elif family in matches:
+            # if the same classification already exists, simply ignore for
+            # now
+            pass
+        else:
+            print("(%s) multiple classifications for %s: %s" % 
+                  (target_name, 
+                   general_name, ", ".join(matches.union([family]))))
+        
+    return collapsed
+
+def get_tap_diversity(results):
+    """Generates a dict of TAP diversity organized by target species"""
+    # create a dict to keep track unique matches:
+    #
+    # {
+    #    species1: {TR: {...}, TF:{...}, PT: {...}},
+    #    species2:...
+    #    etc,..
+    # }
+    #
+    tap_diversity = {}
+    
+    # write summary file with unique and total classification numbers
+    for name, cls in results.items():
+        # keep track of unique TAP familes
+        tap_diversity[name] = {
+            "TR": set(cls[cls['type'] == "TR"]['family']),
+            "TF": set(cls[cls['type'] == "TF"]['family']),
+            "PT": set(cls[cls['type'] == "PT"]['family'])
+        }
+        
+    return tap_diversity
+
+def write_classification_summary(results, tap_diversity):
+    """Write a summary csv reports"""
+    filepath = '../csv/classifications/classification_SUMMARY.csv'
+    writer = csv.writer(open(filepath, 'wt'))
+    writer.writerow(['species', 'TR (total)', 'TF (total)', 'PT (total)',
+                     'TR (unique)', 'TF (unique)', 'PT (unique)'])
+    
+    # write summary file with unique and total classification numbers
+    for name, cls in results.items():
+        # keep track of unique TAP familes
+        tap_diversity[name] = {
+            "TR": set(cls[cls['type'] == "TR"]['family']),
+            "TF": set(cls[cls['type'] == "TF"]['family']),
+            "PT": set(cls[cls['type'] == "PT"]['family'])
+        }
+        
+        # add row to summary csv
+        writer.writerow((name,
+             list(cls['type']).count("TR"), 
+             list(cls['type']).count("TF"),
+             list(cls['type']).count("PT"),
+             len(tap_diversity[name]["TR"]),
+             len(tap_diversity[name]["TF"]),
+             len(tap_diversity[name]["PT"])
+        ))
+
+def write_tap_correlation_csv(tap_diversity, 
+                                       prefix='../csv/taps/correlation'):
+    """Generates a CSV file corresponding to the pair-wise correlations between
+    the TAP complements of each target species."""
+    # write additional csv files with pair-wise correlations
+    species = tap_diversity.keys()
+    
+    for type_ in ["TR", "TF", "PT", "TOTAL"]:
+        filepath = prefix + ("_%s.csv" % type_)
+        writer = csv.writer(open(filepath, 'wt'))
+        writer.writerow([None] + species)     
+        
+        for i, species1 in enumerate(species):
+            if type_ == "TOTAL":
+                set1 = set(results[species1]['family'])
+            else:
+                set1 = tap_diversity[species1][type_]
+            
+            row = [species1]
+            
+            # find correlation for TAP complements for each species pair
+            for j, species2 in enumerate(species):
+                # only include one side of diagonal
+                if j > i:
+                    row.append(None)
+                    continue
+
+                if type_ == "TOTAL":
+                    set2 = set(results[species2]['family'])
+                else:
+                    set2 = tap_diversity[species2][type_]
+                    
+                # correlation = INTERSECTION(TAPs) / UNION(TAPs)
+                correlation = (len(set1.intersection(set2)) / 
+                               float(len(set1.union(set2))))
+                row.append(correlation)
+
+            writer.writerow(row)
 
 def write_domain_summary_csv(domains):
     """Writes a sumary of the protein domains matched for each target species"""
@@ -174,78 +292,7 @@ def write_domain_summary_csv(domains):
             row.append(correlation)
 
         writer.writerow(row)
-
-def write_summary_csv(results):
-    """Write a summary csv reports"""
-    filepath = '../csv/classifications/classification_SUMMARY.csv'
-    writer = csv.writer(open(filepath, 'wt'))
-    writer.writerow(['species', 'TR (total)', 'TF (total)', 'PT (total)',
-                     'TR (unique)', 'TF (unique)', 'PT (unique)'])
-    
-    # create a dict to keep track unique matches:
-    #
-    # {
-    #    species1: {TR: {...}, TF:{...}, PT: {...}},
-    #    species2:...
-    #    etc,..
-    # }
-    #
-    tap_diversity = {}
-    
-    # write summary file with unique and total classification numbers
-    for name, cls in results.items():
-        # keep track of unique TAP familes
-        tap_diversity[name] = {
-            "TR": set(cls[cls['type'] == "TR"]['family']),
-            "TF": set(cls[cls['type'] == "TF"]['family']),
-            "PT": set(cls[cls['type'] == "PT"]['family'])
-        }
-        
-        # add row to summary csv
-        writer.writerow((name,
-             list(cls['type']).count("TR"), 
-             list(cls['type']).count("TF"),
-             list(cls['type']).count("PT"),
-             len(tap_diversity[name]["TR"]),
-             len(tap_diversity[name]["TF"]),
-             len(tap_diversity[name]["PT"])
-        ))
-        
-    # write additional csv files with pair-wise correlations
-    species = tap_diversity.keys()
-    
-    for type_ in ["TR", "TF", "PT", "TOTAL"]:
-        filepath = '../csv/taps/correlation_%s.csv' % type_
-        writer = csv.writer(open(filepath, 'wt'))
-        writer.writerow([None] + species)     
-        
-        for i, species1 in enumerate(species):
-            if type_ == "TOTAL":
-                set1 = set(results[species1]['family'])
-            else:
-                set1 = tap_diversity[species1][type_]
-            
-            row = [species1]
-            
-            # find correlation for TAP complements for each species pair
-            for j, species2 in enumerate(species):
-                # only include one side of diagonal
-                if j > i:
-                    row.append(None)
-                    continue
-
-                if type_ == "TOTAL":
-                    set2 = set(results[species2]['family'])
-                else:
-                    set2 = tap_diversity[species2][type_]
-                    
-                # correlation = INTERSECTION(TAPs) / UNION(TAPs)
-                correlation = (len(set1.intersection(set2)) / 
-                               float(len(set1.union(set2))))
-                row.append(correlation)
-
-            writer.writerow(row)
-    
+           
 def init_classification_rules():
     "Initializes protein classification rules"""
     # @TODO: REPLACE legacy ids, add note...
