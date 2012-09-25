@@ -38,6 +38,12 @@ def main():
     results = {}
     domains = {}
     
+    # create necessary directories if they do not already exist
+    for d in ["classification", "domains", "taps"]:
+        dir = os.path.join("../csv/", d)
+        if not os.path.isdir(dir):
+            os.makedirs(dir)
+    
     # read in hmmer tables
     for filepath in sys.argv[1:]:
         recarray = hmmer.parse_csv(filepath)
@@ -66,8 +72,8 @@ def main():
             contigs.append(Contig(contig_id, contig_domains))
     
         # open csv file for output
-        filename =  base_filename + "_classification.csv"
-        writer = csv.writer(open(os.path.join("../csv/classification", 
+        filename =  "classification_%s.csv" % base_filename 
+        writer = csv.writer(open(os.path.join("../csv/classifications", 
                                               filename), 'wt'))
         writer.writerow(['contig', 'family', 'type'])
         
@@ -134,7 +140,7 @@ def main():
 
 def write_domain_summary_csv(domains):
     """Writes a sumary of the protein domains matched for each target species"""
-    filepath = '../csv/summary_protein_domains.csv'
+    filepath = '../csv/domains/domain_summary.csv'
     writer = csv.writer(open(filepath, 'wt'))
     writer.writerow(["Species", "Domains (total)", "Domains (unique)"])
     
@@ -144,7 +150,7 @@ def write_domain_summary_csv(domains):
     # pair-wise domain comparison
     species = domains.keys()
     
-    filepath = '../csv/classification/correlations_domains.csv'
+    filepath = '../csv/domains/domain_correlations.csv'
     writer = csv.writer(open(filepath, 'wt'))
     writer.writerow([None] + species)     
     
@@ -171,7 +177,7 @@ def write_domain_summary_csv(domains):
 
 def write_summary_csv(results):
     """Write a summary csv reports"""
-    filepath = '../csv/classification/classification_summary.csv'
+    filepath = '../csv/classifications/classification_SUMMARY.csv'
     writer = csv.writer(open(filepath, 'wt'))
     writer.writerow(['species', 'TR (total)', 'TF (total)', 'PT (total)',
                      'TR (unique)', 'TF (unique)', 'PT (unique)'])
@@ -209,7 +215,7 @@ def write_summary_csv(results):
     species = tap_diversity.keys()
     
     for type_ in ["TR", "TF", "PT", "TOTAL"]:
-        filepath = '../csv/classification/correlations_%s.csv' % type_
+        filepath = '../csv/taps/correlation_%s.csv' % type_
         writer = csv.writer(open(filepath, 'wt'))
         writer.writerow([None] + species)     
         
