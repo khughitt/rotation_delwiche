@@ -53,7 +53,8 @@ def main():
     write_classification_summary(results, tap_diversity)
     write_domain_summary_csv(domains)
     write_tap_correlation_csv(tap_diversity)
-
+    write_extended_tap_correlation_csv(tap_diversity)
+    
     return results
 
 def classify_species(filepath, results, domains, protein_families):
@@ -217,12 +218,11 @@ def write_classification_summary(results, tap_diversity):
              len(tap_diversity[name]["PT"])
         ))
 
-def write_tap_correlation_csv(tap_diversity, 
-                                       prefix='../csv/taps/correlation'):
+def write_tap_correlation_csv(taps, prefix='../csv/taps/correlation'):
     """Generates a CSV file corresponding to the pair-wise correlations between
     the TAP complements of each target species."""
     # write additional csv files with pair-wise correlations
-    species = tap_diversity.keys()
+    species = taps.keys()
     
     for type_ in ["TR", "TF", "PT", "TOTAL"]:
         filepath = prefix + ("_%s.csv" % type_)
@@ -231,9 +231,10 @@ def write_tap_correlation_csv(tap_diversity,
         
         for i, species1 in enumerate(species):
             if type_ == "TOTAL":
-                set1 = set(results[species1]['family'])
+                set1 = (taps[species1]['TR'].union(taps[species1]['TF'])
+                                            .union(taps[species1]['PT']))
             else:
-                set1 = tap_diversity[species1][type_]
+                set1 = taps[species1][type_]
             
             row = [species1]
             
@@ -245,16 +246,71 @@ def write_tap_correlation_csv(tap_diversity,
                     continue
 
                 if type_ == "TOTAL":
-                    set2 = set(results[species2]['family'])
+                    set2 = (taps[species2]['TR'].union(taps[species2]['TF'])
+                                                .union(taps[species2]['PT']))
                 else:
-                    set2 = tap_diversity[species2][type_]
+                    set2 = taps[species2][type_]
                     
                 # correlation = INTERSECTION(TAPs) / UNION(TAPs)
-                correlation = (len(set1.intersection(set2)) / 
-                               float(len(set1.union(set2))))
+                intersection = len(set1.intersection(set2))
+                union = float(len(set1.union(set2)))
+                
+                # if at least some TAPs are shared between species, calculate
+                # a correlation
+                if union > 0:
+                    correlation = intersection / union
+                elif union == 0 and intersection == 0:
+                    correlation = 1.
+                else:
+                    correlation = 0.
+                    
                 row.append(correlation)
 
             writer.writerow(row)
+
+def write_extended_tap_correlation_csv(tap_diversity):
+    """Similar to write_tap_correlation_csv, but includes additional TAP
+    information from supplement 4 (original paper classifications)."""
+    input_file = open("../input/Suppl.Table4.csv")
+    
+    # read in original classifications
+    datatypes = ["S32", "S16"] + (54 * ['i4'])
+    data = np.genfromtxt('../input/Suppl.Table4.csv', 
+                         delimiter=';', names=True, dtype=datatypes)
+    
+    # get a list of species
+    targets = data.dtype.names[2:]
+    
+    # list of TAP families
+    taps = data['TAP']
+    
+    # add classifications to existing tap_diversity list
+    for species in targets:
+        tap_diversity[species] = {
+            "TR": [],
+            "TF": [],
+            "PT": []
+        }
+        
+        for i, tap in enumerate(taps):
+            # skip no_family_found
+            if tap == "no_family_found":
+                continue
+            
+            # otherwise add TAP to set if at least one protein matched
+            type_ = data[i][1]
+            if data[species][i] > 0:
+                tap_diversity[species][type_].append(tap)
+                
+        # convert to sets
+        tap_diversity[species] = {
+            "TR": set(tap_diversity[species]['TR']),
+            "TF": set(tap_diversity[species]['TF']),
+            "PT": set(tap_diversity[species]['PT'])
+        }
+    
+    # write out
+    write_tap_correlation_csv(tap_diversity, '../csv/taps/correlation_ext')
 
 def write_domain_summary_csv(domains):
     """Writes a sumary of the protein domains matched for each target species"""

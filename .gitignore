@@ -2,7 +2,7 @@ csv/*
 data/*
 doc/
 logs/*
-output/*
+input/hmmsearch/*
 data
 .project
 .pydevproject
