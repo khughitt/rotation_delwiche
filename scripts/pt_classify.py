@@ -34,31 +34,38 @@ def main():
     # initialize ProteinFamily instances for each set of classification rules
     protein_families = init_classification_rules()
     
-    # create a master dictionary to keep track of results
+    # create a master dictionaries to keep track of results
     results = {}
+    domains = {}
     
     # read in hmmer tables
     for filepath in sys.argv[1:]:
         recarray = hmmer.parse_csv(filepath)
         
+        # output base filename
+        base_filename = os.path.splitext(os.path.basename(filepath))[0]
+        
         # list to store contigs in
         contigs = []
         
+        # keep a record of all the protein domains for each species
+        domains[base_filename] = []
+        
         # sort domain matches by contig id
         for contig_id in set(recarray['target_name']):
-            domains = []
+            contig_domains = []
             
             # add unique domains associated with the contig id
             for row in recarray[recarray['target_name'] == contig_id]:
-                if row['query_name'] not in [d.name for d in domains]:
+                if row['query_name'] not in [d.name for d in contig_domains]:
                     domain = ProteinDomain(row['query_name'], row['Evalue'])
-                    domains.append(domain)
+                    contig_domains.append(domain)
+                    domains[base_filename].append(row['query_name'])
             
             # create contig and add to the list
-            contigs.append(Contig(contig_id, domains))
+            contigs.append(Contig(contig_id, contig_domains))
     
         # open csv file for output
-        base_filename = os.path.splitext(os.path.basename(filepath))[0]
         filename =  base_filename + "_classification.csv"
         writer = csv.writer(open(os.path.join("../csv/classification", 
                                               filename), 'wt'))
@@ -120,8 +127,48 @@ def main():
     # write summary csv
     write_summary_csv(results)
     
+    # write domain summary
+    write_domain_summary_csv(domains)
+    
     return results
+
+def write_domain_summary_csv(domains):
+    """Writes a sumary of the protein domains matched for each target species"""
+    filepath = '../csv/summary_protein_domains.csv'
+    writer = csv.writer(open(filepath, 'wt'))
+    writer.writerow(["Species", "Domains (total)", "Domains (unique)"])
+    
+    for species, matches in domains.items():
+        writer.writerow([species, len(matches), len(set(matches))])
         
+    # pair-wise domain comparison
+    species = domains.keys()
+    
+    filepath = '../csv/classification/correlations_domains.csv'
+    writer = csv.writer(open(filepath, 'wt'))
+    writer.writerow([None] + species)     
+    
+    for i, species1 in enumerate(species):
+        set1 = set(domains[species1])
+        
+        row = [species1]
+        
+        # find correlation for TAP complements for each species pair
+        for j, species2 in enumerate(species):
+            # only include one side of diagonal
+            if j > i:
+                row.append(None)
+                continue
+
+            set2 = set(domains[species2])
+                
+            # correlation = INTERSECTION(TAPs) / UNION(TAPs)
+            correlation = (len(set1.intersection(set2)) / 
+                           float(len(set1.union(set2))))
+            row.append(correlation)
+
+        writer.writerow(row)
+
 def write_summary_csv(results):
     """Write a summary csv reports"""
     filepath = '../csv/classification/classification_summary.csv'
