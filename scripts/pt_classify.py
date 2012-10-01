@@ -56,6 +56,9 @@ def main():
     write_tap_correlation_csv(tap_diversity, normalize=True)
     write_extended_tap_correlation_csv(tap_diversity)
     
+    # output phylip character matrix
+    write_phylip_char_matrix(results, protein_families)
+    
     return results
 
 def classify_species(filepath, results, domains, protein_families):
@@ -373,6 +376,30 @@ def write_domain_summary_csv(domains):
             row.append(correlation)
 
         writer.writerow(row)
+
+def write_phylip_char_matrix(species, protein_families):
+    """Writes a phylip boolean character matrix representing the presence or
+    absense of each TAP family for each species."""
+    families = [x.name for x in protein_families]
+    
+    # open file for output
+    fp = open("output.phylip", "w")
+    fp.write("%d %d\n" % (len(species), len(families)))
+    
+    for name, table in species.items():
+        row = []
+        
+        # Get a list of the protein families that were matched
+        matched_families = set(table['family'])
+        
+        # Output a boolean character row
+        for family in families:
+            if family in matched_families:
+                row.append("1")
+            else:
+                row.append("0")
+                
+        fp.write(name.ljust(28) + "".join(row) + "\n")
            
 def init_classification_rules():
     "Initializes protein classification rules"""
