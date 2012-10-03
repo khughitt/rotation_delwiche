@@ -38,7 +38,7 @@ def write_correlation_csv(targets, normalize=False):
     else:
         suffix = ""
 
-    writer = csv.writer(open("../csv/pfam_domains%s.csv" % (suffix), 'wt'))
+    writer = csv.writer(open("../csv/domains/pfam_domains%s.csv" % (suffix), 'wt'))
     writer.writerow([None] + targets.keys())
     
     i = 0

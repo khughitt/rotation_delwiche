@@ -51,6 +51,10 @@ def main():
         
     # output summary files
     write_classification_summary(results, tap_diversity)
+    
+    #
+    # TODO: Pickle results and break up into smaller scripts.
+    #    
     write_domain_summary_csv(domains)
     write_tap_correlation_csv(tap_diversity)
     write_tap_correlation_csv(tap_diversity, normalize=True)
@@ -128,7 +132,7 @@ def load_contigs(target, recarray, domains):
 
 def create_output_dirs():
     """Creates output directories if they don't already exist"""
-    for d in ["classifications", "domains", "taps"]:
+    for d in ["classifications", "domains", "taps", "taps/gratol", "taps/all"]:
         dir = os.path.join("../csv/", d)
         if not os.path.isdir(dir):
             os.makedirs(dir)
@@ -205,13 +209,6 @@ def write_classification_summary(results, tap_diversity):
     
     # write summary file with unique and total classification numbers
     for name, cls in results.items():
-        # keep track of unique TAP familes
-        tap_diversity[name] = {
-            "TR": set(cls[cls['type'] == "TR"]['family']),
-            "TF": set(cls[cls['type'] == "TF"]['family']),
-            "PT": set(cls[cls['type'] == "PT"]['family'])
-        }
-        
         # add row to summary csv
         writer.writerow((name,
              list(cls['type']).count("TR"), 
@@ -222,7 +219,7 @@ def write_classification_summary(results, tap_diversity):
              len(tap_diversity[name]["PT"])
         ))
 
-def write_tap_correlation_csv(taps, prefix='../csv/taps/correlation', 
+def write_tap_correlation_csv(taps, prefix='../csv/taps/gratol/correlation', 
                               normalize=False):
     """Generates a CSV file corresponding to the pair-wise correlations between
     the TAP complements of each target species.
@@ -297,11 +294,11 @@ def write_tap_correlation_csv(taps, prefix='../csv/taps/correlation',
 def write_extended_tap_correlation_csv(tap_diversity):
     """Similar to write_tap_correlation_csv, but includes additional TAP
     information from supplement 4 (original paper classifications)."""
-    input_file = open("../input/Suppl.Table4.csv")
-    
     # read in original classifications
-    datatypes = ["S32", "S16"] + (54 * ['i4'])
-    data = np.genfromtxt('../input/Suppl.Table4.csv', 
+    num_species = 20
+    
+    datatypes = ["S32", "S16"] + (num_species * ['i4'])
+    data = np.genfromtxt('../input/Suppl.Table4b.csv', 
                          delimiter=';', names=True, dtype=datatypes)
     
     # get a list of species
@@ -336,13 +333,13 @@ def write_extended_tap_correlation_csv(tap_diversity):
         }
     
     # write out
-    write_tap_correlation_csv(tap_diversity, '../csv/taps/correlation_ext')
-    write_tap_correlation_csv(tap_diversity, '../csv/taps/correlation_ext', 
+    write_tap_correlation_csv(tap_diversity, '../csv/taps/all/correlation_ext')
+    write_tap_correlation_csv(tap_diversity, '../csv/taps/all/correlation_ext', 
                               normalize=True)
 
 def write_domain_summary_csv(domains):
     """Writes a sumary of the protein domains matched for each target species"""
-    filepath = '../csv/domains/domain_summary.csv'
+    filepath = '../csv/domains/tap_domain_summary.csv'
     writer = csv.writer(open(filepath, 'wt'))
     writer.writerow(["Species", "Domains (total)", "Domains (unique)"])
     
@@ -352,7 +349,7 @@ def write_domain_summary_csv(domains):
     # pair-wise domain comparison
     species = domains.keys()
     
-    filepath = '../csv/domains/domain_correlations.csv'
+    filepath = '../csv/domains/tap_domain_correlations.csv'
     writer = csv.writer(open(filepath, 'wt'))
     writer.writerow([None] + species)     
     
@@ -383,7 +380,7 @@ def write_phylip_char_matrix(species, protein_families):
     families = [x.name for x in protein_families]
     
     # open file for output
-    fp = open("output.phylip", "w")
+    fp = open("../trees/output.phylip", "w")
     fp.write("%d %d\n" % (len(species), len(families)))
     
     for name, taps in species.items():

@@ -2,8 +2,10 @@ csv/*
 data/*
 doc/
 logs/*
-input/hmmsearch/*
-input/hmmsearch_full/*
+pickle/*
+trees/*
+input/hmmsearch_taps/*
+input/hmmsearch_pfam/*
 data
 .project
 .pydevproject
