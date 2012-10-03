@@ -3,6 +3,7 @@ data/*
 doc/
 logs/*
 input/hmmsearch/*
+input/hmmsearch_full/*
 data
 .project
 .pydevproject

@@ -57,7 +57,7 @@ def main():
     write_extended_tap_correlation_csv(tap_diversity)
     
     # output phylip character matrix
-    write_phylip_char_matrix(results, protein_families)
+    write_phylip_char_matrix(tap_diversity, protein_families)
     
     return results
 
@@ -386,11 +386,11 @@ def write_phylip_char_matrix(species, protein_families):
     fp = open("output.phylip", "w")
     fp.write("%d %d\n" % (len(species), len(families)))
     
-    for name, table in species.items():
+    for name, taps in species.items():
         row = []
         
         # Get a list of the protein families that were matched
-        matched_families = set(table['family'])
+        matched_families = taps['TR'].union(taps['TF']).union(taps['PT'])
         
         # Output a boolean character row
         for family in families:
