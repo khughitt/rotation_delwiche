@@ -60,9 +60,13 @@ def main():
     write_tap_correlation_csv(tap_diversity, normalize=True)
     write_extended_tap_correlation_csv(tap_diversity)
     
-    # output phylip character matrix
-    write_phylip_char_matrix(tap_diversity, protein_families)
-    
+    # output phylip character matrices
+    write_phylip_char_matrix(tap_diversity, protein_families, "cyame")
+    write_phylip_char_matrix(tap_diversity, protein_families, "cyame", ["TF"], 
+                             "infile_TF")
+    write_phylip_char_matrix(tap_diversity, protein_families, "cyame", ["TR"], 
+                             "infile_TR")
+
     return results
 
 def classify_species(filepath, results, domains, protein_families):
@@ -191,7 +195,7 @@ def get_tap_diversity(results):
     
     # write summary file with unique and total classification numbers
     for name, cls in results.items():
-        # keep track of unique TAP familes
+        # keep track of unique TAP families
         tap_diversity[name] = {
             "TR": set(cls[cls['type'] == "TR"]['family']),
             "TF": set(cls[cls['type'] == "TF"]['family']),
@@ -374,29 +378,56 @@ def write_domain_summary_csv(domains):
 
         writer.writerow(row)
 
-def write_phylip_char_matrix(species, protein_families):
+def write_phylip_char_matrix(targets, protein_families, outgroup=None, 
+                             tap_classes=None, filename="infile"):
     """Writes a phylip boolean character matrix representing the presence or
     absense of each TAP family for each species."""
-    families = [x.name for x in protein_families]
+    # include all TAP classes by default
+    if tap_classes is None:
+        tap_classes = ["TF", "TR", "PT"]
+        
+    # make a copy of species dictionary so that when outgroup is removed it
+    # does not affect original dict
+    species = targets.copy()
+    
+    families = [x.name for x in protein_families if x.type in tap_classes]
     
     # open file for output
-    fp = open("../trees/output.phylip", "w")
+    fp = open(os.path.join("../trees/", filename), "w")
     fp.write("%d %d\n" % (len(species), len(families)))
     
+    # put outgroup first
+    if outgroup is not None:
+        # add outgroup
+        row = get_char_matrix_row(outgroup, species[outgroup], families, tap_classes)
+        fp.write(outgroup.ljust(28) + "".join(row) + "\n")
+        
+        # remove from set so it doesn't get double-counted
+        species.pop(outgroup)
+    
+    # process rest of the species
     for name, taps in species.items():
-        row = []
-        
-        # Get a list of the protein families that were matched
-        matched_families = taps['TR'].union(taps['TF']).union(taps['PT'])
-        
-        # Output a boolean character row
-        for family in families:
-            if family in matched_families:
-                row.append("1")
-            else:
-                row.append("0")
+        row = get_char_matrix_row(name, taps, families, tap_classes)
                 
         fp.write(name.ljust(28) + "".join(row) + "\n")
+        
+def get_char_matrix_row(species, taps, families, tap_classes):
+    """Computes a single row in the character matrix"""
+    row = []
+    
+    matched_families = set([])
+    
+    for cls in tap_classes:
+        matched_families = matched_families.union(taps[cls])        
+    
+    # Output a boolean character row
+    for family in families:
+        if family in matched_families:
+            row.append("1")
+        else:
+            row.append("0")
+            
+    return row
            
 def init_classification_rules():
     "Initializes protein classification rules"""

@@ -6,9 +6,11 @@ pickle/*
 trees/*
 input/hmmsearch_taps/*
 input/hmmsearch_pfam/*
+input/gene_ontology.1_2.obo
 data
 .project
 .pydevproject
 .settings
 *.pyc
 __pycache__
+TODO

@@ -39,7 +39,7 @@ def parse_csv(filepath):
 
     return np.genfromtxt(fp, dtype=None, names=col_names, delimiter=col_widths,
                          autostrip=True)
-                         
+
 def plot_evalue_histogram(recarray, filename, title=""):
     """Creates a histogram of E-values for each species"""
     fig = plt.figure()
