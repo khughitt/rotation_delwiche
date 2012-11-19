@@ -107,12 +107,52 @@ def load_pfam2go(source=None):
         
     return mapping
 
+def write_csv(results, filepath, norm=None):
+    """Write GO analysis results to CSV"""
+    # get a list of all GO categories used
+    categories = set([])
+    for data in results.values():
+        categories = categories.union(data.keys())
+
+    # if no normalization requested do not scale results
+    if norm is None:
+        scale_factors = {k: 1 for k in results.keys()}
+    else:
+        # otherwise divide norm value by the number of Pfam domains used
+        scale_factors = {}
+        
+        for species, data in results.items():
+            # get total number of domains
+            total = 0
+            
+            for term, value in data.items():
+                total += value
+                
+            # scale factor = NORM / NUM DOMAINS
+            scale_factors[species] = norm / float(total)
+        
+    # write results to CSV
+    writer = csv.writer(open(filepath, 'wt'))
+    writer.writerow(["category"] + results.keys())
+    
+    for category in categories:
+        row = [category]
+        for species, data in results.items():
+            # add category count if it exists for the species
+            if category in data:
+                row.append(int(round(data[category] * scale_factors[species])))
+            else:
+                # otherwise add 0
+                row.append(0)
+        # add row to CSV
+        writer.writerow(row)
+    
+
 def parse_hmmer_table(filepath):
     """Parses a hmmer table and outputs a summary of the Pfam GO associations"""
     
 if __name__ == "__main__":
     go_input = "../input/gene_ontology.1_2.obo"
-    go_output = "../csv/go_analysis.csv"
     pfam2go_file = "../input/pfam2go.txt"
     
     # load Gene ontology
@@ -131,23 +171,7 @@ if __name__ == "__main__":
         name = os.path.splitext(os.path.basename(filepath))[0]
         results[name] = analyze_hmmer_table(go_terms, pfam2go, filepath)
     
-    # get a list of all GO categories used
-    categories = set([])
-    for data in results.values():
-        categories = categories.union(data.keys())
-        
-    # write results to CSV
-    writer = csv.writer(open(go_output, 'wt'))
-    writer.writerow(["category"] + results.keys())
-    
-    for category in categories:
-        row = [category]
-        for species in results.values():
-            # add category count if it exists for the species
-            if category in species:
-                row.append(species[category])
-            else:
-                # otherwise add 0
-                row.append(0)
-        # add row to CSV
-        writer.writerow(row)
+    # output results to CSV
+    write_csv(results, "../csv/go_analysis.csv")
+    write_csv(results, "../csv/go_analysis_normed.csv", norm=5e4)
+
