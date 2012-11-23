@@ -6,6 +6,9 @@ Overview
 This repository includes all of the code related to a project I worked on as 
 part of a first-year lab rotation in the [Delwiche laboratory](http://www.life.umd.edu/labs/delwiche/home.html).
 
+![Spirogyra](https://raw.github.com/khughitt/rotation_delwiche/master/extra/3x2_millimeters_of_Spirogyra.jpg)
+(source: [Wikipedia](http://commons.wikimedia.org/wiki/File:3x2_millimeters_of_Spirogyra.jpg))
+
 The project was inspired by a [2009 study by Lang et. al.](http://www.ncbi.nlm.nih.gov/pubmed/20644220)
 that, among other things,  looked at correlations between increases in the 
 Transcription-Associated Protein (TAP) family diversity and several milestones 
