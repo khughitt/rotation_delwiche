@@ -6,8 +6,12 @@ classification project.
 
 Contents
 --------
-* **count_tap_domains.py** - Parses HMMSearch output and counts the number of 
+* **count_tap_domains.py** - Parses hmmsearch output and counts the number of 
 TAP domains found for each species.
+* **hmmer.py** - Methods for working with HMMER3 output. Includes a method to
+convert hmmsearch output to a [NumPy recarray](http://docs.scipy.org/doc/numpy/reference/generated/numpy.recarray.html)
+as well as a method for generating a histogram of hmmsearch E-values.
 * **trinity_contig_stats.py** - Parses [Trinity](http://trinityrnaseq.sourceforge.net/)
 FASTA output and prints number of contigs and mean contig length.
+
 
