@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 #-*- coding:utf-8 -*-
-"""Replace abbreviated name with long versions and display the tree."""
+"""Parses output from PHYLIP tree generation and generates a new version of the
+using the complete species names."""
 import sys
 
 def main():

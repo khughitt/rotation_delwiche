@@ -6,6 +6,8 @@ classification project.
 
 Contents
 --------
+* **convert_tree_names.py** - Parses output from PHYLIP tree generation and 
+generates a new version of the using the complete species names.
 * **count_tap_domains.py** - Parses hmmsearch output and counts the number of 
 TAP domains found for each species.
 * **evalue_histograms.py** - Generates histograms of hmmsearch E-values.
