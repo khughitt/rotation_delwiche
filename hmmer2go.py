@@ -15,7 +15,7 @@ import os
 import re
 import sys
 import csv
-import hmmer
+from scripts import hmmer
 from goatools import obo_parser
 
 def analyze_hmmer_table(go_terms, pfam2go, hmmer_table, go_level=1):

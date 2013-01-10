@@ -17,7 +17,7 @@ similarity?)
 
 Usage:
 ------
-pt_classify.py hmmertbl.csv hmmertbl2.csv...
+classify_contigs.py hmmertbl.csv hmmertbl2.csv...
 
 References:
 -----------
@@ -27,7 +27,7 @@ import sys
 import csv
 import os
 import numpy as np
-import hmmer
+from scripts import hmmer
 
 def main():
     """Main application body""" 

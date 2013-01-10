@@ -6,6 +6,8 @@ classification project.
 
 Contents
 --------
-* *trinity_contig_stats.py* Parses [Trinity](http://trinityrnaseq.sourceforge.net/)
+* **count_tap_domains.py** - Parses HMMSearch output and counts the number of 
+TAP domains found for each species.
+* **trinity_contig_stats.py** - Parses [Trinity](http://trinityrnaseq.sourceforge.net/)
 FASTA output and prints number of contigs and mean contig length.
 
