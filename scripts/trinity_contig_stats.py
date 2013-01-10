@@ -1,7 +1,15 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python
 #-*- coding:utf-8 -*-
 """
 Trinity contig statistics
+
+Parses a Trinity contig assembly file outputs the total number of contigs and
+the mean contig length.
+
+References
+----------
+* http://trinityrnaseq.sourceforge.net/
+
 """
 import sys
 import os
