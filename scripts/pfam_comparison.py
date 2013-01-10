@@ -1,7 +1,12 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python
 #-*- coding:utf-8 -*-
-"""Prints some basic statistics about full Pfam-A.hmm search results for 
-a number of target species."""
+"""
+Compares output from a full Pfam-A.hmm search for a number of target speicies.
+
+Example Usage
+-------------
+./pfam_comparison.py ../input/hmmsearch_pfam/*.csv
+"""
 import sys
 import os
 import csv
@@ -23,13 +28,11 @@ def main():
         # output basic statistics
         print("(%s) # Domains: %d (%d unique)" % (name, recarray.shape[0],
                                                   len(targets[name])))
-        
+
     # pairwise comparisons
     write_correlation_csv(targets)
     write_correlation_csv(targets, True)
-    
 
-        
 def write_correlation_csv(targets, normalize=False):
     """write csv"""
     # choose a file to write to
@@ -38,7 +41,8 @@ def write_correlation_csv(targets, normalize=False):
     else:
         suffix = ""
 
-    writer = csv.writer(open("../csv/domains/pfam_domains%s.csv" % (suffix), 'wt'))
+    output_file = "../csv/domains/pfam_domains%s.csv" % suffix
+    writer = csv.writer(open(output_file, 'wt'))
     writer.writerow([None] + targets.keys())
     
     i = 0
@@ -75,6 +79,8 @@ def write_correlation_csv(targets, normalize=False):
 
         writer.writerow(row)
         i += 1
+
+    print("Saved output to %s." % output_file)
 
 if __name__ == "__main__":
     result = main()

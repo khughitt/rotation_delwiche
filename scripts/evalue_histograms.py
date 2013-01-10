@@ -1,11 +1,11 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python
 #-*- coding:utf-8 -*-
 """
 Generate E-Value histogram plots for each HMMER csv file specified
 
 Usage:
 
-    pt_evalue_histograms.py Mviride.csv Nmirabilis.csv
+    ./evalue_histograms.py ../input/hmmsearch_taps/*.csv
 """
 import sys
 import hmmer
